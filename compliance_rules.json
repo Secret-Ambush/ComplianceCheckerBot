@@ -1,0 +1,126 @@
+[
+    {
+        "rule_id": "DOC_MATCH_001",
+        "description": "Invoice PO number must match PO document PO number",
+        "applies_to": [
+            "invoice",
+            "purchase_order"
+        ],
+        "fields": {
+            "invoice.po_number": "purchase_order.po_number"
+        },
+        "check_type": "equality",
+        "severity": "critical",
+        "on_fail": "PO number mismatch between Invoice and PO"
+    },
+    {
+        "rule_id": "DOC_MATCH_002",
+        "description": "GRN reference must match invoice delivery reference",
+        "applies_to": [
+            "invoice",
+            "grn"
+        ],
+        "fields": {
+            "invoice.delivery_ref": "grn.ref_number"
+        },
+        "check_type": "equality",
+        "severity": "critical",
+        "on_fail": "Delivery reference mismatch between GRN and Invoice"
+    },
+    {
+        "rule_id": "LOGIC_001",
+        "description": "Invoice quantity should not exceed PO quantity",
+        "applies_to": [
+            "invoice",
+            "purchase_order"
+        ],
+        "fields": {
+            "invoice.quantity": "purchase_order.quantity"
+        },
+        "check_type": "less_than_or_equal",
+        "severity": "critical",
+        "on_fail": "Invoiced quantity exceeds PO quantity"
+    },
+    {
+        "rule_id": "LOGIC_002",
+        "description": "Total amount should equal quantity * unit price",
+        "applies_to": [
+            "invoice"
+        ],
+        "fields": {
+            "invoice.total_amount": [
+                "invoice.quantity",
+                "invoice.unit_price"
+            ]
+        },
+        "check_type": "expression",
+        "expression": "quantity * unit_price",
+        "severity": "high",
+        "on_fail": "Total amount doesn't match calculated amount"
+    },
+    {
+        "rule_id": "CROSS_001",
+        "description": "Invoice date should be after PO date",
+        "applies_to": [
+            "invoice",
+            "purchase_order"
+        ],
+        "fields": {
+            "invoice.date": "purchase_order.date"
+        },
+        "check_type": "date_after",
+        "severity": "medium",
+        "on_fail": "Invoice is dated before the PO"
+    },
+    {
+        "rule_id": "CROSS_002",
+        "description": "GRN date must be before invoice date",
+        "applies_to": [
+            "grn",
+            "invoice"
+        ],
+        "fields": {
+            "grn.date": "invoice.date"
+        },
+        "check_type": "date_before",
+        "severity": "medium",
+        "on_fail": "GRN is dated after the invoice"
+    },
+    {
+        "rule_id": "LOOKUP_001",
+        "description": "Invoice vendor must exist in approved vendor list",
+        "applies_to": [
+            "invoice"
+        ],
+        "fields": {
+            "invoice.vendor_id": "reference.approved_vendors"
+        },
+        "check_type": "lookup",
+        "severity": "critical",
+        "on_fail": "Vendor is not on the approved vendor list"
+    },
+    {
+        "rule_id": "LOOKUP_002",
+        "description": "Invoice currency must be in allowed currencies list",
+        "applies_to": [
+            "invoice"
+        ],
+        "fields": {
+            "invoice.currency": "reference.allowed_currencies"
+        },
+        "check_type": "lookup",
+        "severity": "high",
+        "on_fail": "Currency not allowed for invoicing"
+    },
+    {
+        "rule_id": "INVOICE_TOTAL_THRESHOLD",
+        "description": "Total invoice amount must not exceed 10,000 AED",
+        "applies_to": ["invoice"],
+        "fields": {
+            "invoice.fields.total_amount": "10000"
+        },
+        "check_type": "less_than_or_equal",
+        "severity": "high",
+        "on_fail": "Total invoice amount exceeds the permitted threshold"
+    } 
+]
