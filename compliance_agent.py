@@ -35,20 +35,9 @@ def compare_values(a: Any, b: Any, check_type: str, parameters: Dict[str, Any] =
         elif check_type == "date_before":
             from dateutil.parser import parse
             return parse(a) < parse(b)
-        elif check_type == "expression":
-            q = float(get_nested_value(documents, parameters["quantity"]))
-            p = float(get_nested_value(documents, parameters["unit_price"]))
-            return float(a) == q * p
     except Exception:
         return False
     return False
-
-def is_literal(value: str) -> bool:
-    try:
-        float(value.replace(',', ''))
-        return True
-    except (ValueError, AttributeError):
-        return False
 
 def evaluate_rule(rule: Dict[str, Any], documents: Dict[str, Dict[str, Any]], enable_llm: bool = False) -> Dict[str, Any]:
     check_type = rule["check_type"]
@@ -66,18 +55,21 @@ def evaluate_rule(rule: Dict[str, Any], documents: Dict[str, Dict[str, Any]], en
         a_path, b_path = list(fields.items())[0]
         a_value = get_nested_value(documents, a_path)
 
-        # Handle literals and reference lookups
+        # Determine b_value as path, reference, number, or literal
         if isinstance(b_path, (int, float)):
             b_value = b_path
-        elif isinstance(b_path, str) and is_literal(b_path):
-            b_value = float(b_path.replace(',', ''))
-        elif isinstance(b_path, str) and "reference" in b_path:
-            b_value = documents.get("reference", {}).get(b_path.split('.')[-1], [])
+        elif isinstance(b_path, str):
+            if "." in b_path and not b_path.startswith("reference."):
+                b_value = get_nested_value(documents, b_path)
+            elif b_path.startswith("reference."):
+                b_value = documents.get("reference", {}).get(b_path.split('.')[-1], [])
+            else:
+                b_value = b_path  # Treat as literal string
         else:
-            b_value = get_nested_value(documents, b_path)
+            b_value = None
 
         values[a_path] = a_value
-        values[b_path] = b_value
+        values[str(b_path)] = b_value
         result = compare_values(a_value, b_value, check_type, rule.get("parameters", {}))
 
     result_obj = {
@@ -101,28 +93,3 @@ def evaluate_all_rules(rules: List[Dict[str, Any]], documents: Dict[str, Dict[st
 def filter_rules_for_docs(rules: List[Dict[str, Any]], docs: Dict[str, Any]) -> List[Dict[str, Any]]:
     available = set(docs.keys())
     return [r for r in rules if set(r["applies_to"]).issubset(available)]
-
-# Example Test:
-# if __name__ == "__main__":
-#     rules = json.load(open("compliance_rules.json"))
-#     documents = {
-#         "invoice": {
-#             "filename": "invoice (1).PDF",
-#             "doc_type": "invoice",
-#             "vendor": "generic",
-#             "fields": {
-#                 "po_number": "1002475",
-#                 "invoice_number": "626867-ADS1-1",
-#                 "invoice_date": "12-Aug-2023",
-#                 "currency": "AED",
-#                 "total_amount": "168.70"
-#             }
-#         },
-#         "reference": {
-#             "approved_vendors": ['generic'],
-#             "allowed_currencies": ['AED']
-#         }
-#     }
-#     relevant_rules = filter_rules_for_docs(rules, documents)
-#     results = evaluate_all_rules(relevant_rules, documents, enable_llm=True)
-#     print(json.dumps(results, indent=2))

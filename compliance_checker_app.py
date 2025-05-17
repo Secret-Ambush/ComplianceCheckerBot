@@ -8,14 +8,32 @@ from nl_rule_parser import parse_natural_rule
 from compliance_agent import evaluate_rule
 from compliance_report_generator import generate_compliance_report
 
+st.set_page_config(page_title="Compliance Checker Agent", page_icon="📄", layout="centered")
+
+with st.sidebar:
+    st.title("🧠 AI Compliance Agent")
+    st.markdown("""
+    Upload related documents (Invoice, PO, GRN).
+
+    Enter one or more compliance rules like:
+    - Ensure invoice and PO have the same PO number.
+    - Check invoice date is on or after GRN date.
+    - Check vendor is approved.
+
+    Each line will be treated as a separate rule.
+    """)
+    st.info("Uses GPT-4 + Rule Engine", icon="📎")
+
 st.title("📄 Compliance Checker Agent")
 
-uploaded_files = st.file_uploader("Upload one or more documents (PDF, TXT, JPG, PNG)", accept_multiple_files=True)
+uploaded_files = st.file_uploader("📁 Upload one or more documents", accept_multiple_files=True)
+user_instruction = st.text_area("💬 Enter one or more natural language rules (one per line):", height=150)
 
-user_instruction = st.text_input("💬 Enter a natural language compliance rule:")
+if "rule_results" not in st.session_state:
+    st.session_state.rule_results = []
 
-if st.button("Run Compliance Check") and uploaded_files and user_instruction:
-    st.subheader("📂 Processing Uploaded Documents")
+if st.button("▶️ Run Compliance Check") and uploaded_files and user_instruction:
+    st.header("🧾 Step 1: Document Parsing")
     documents = {}
     for file in uploaded_files:
         suffix = Path(file.name).suffix
@@ -27,45 +45,60 @@ if st.button("Run Compliance Check") and uploaded_files and user_instruction:
             doc = process_document(Path(tmp_path))
             doc_type = doc["doc_type"]
             documents[doc_type] = doc
-            st.success(f"✅ Detected `{doc_type}` from `{file.name}` with extracted fields:")
-            st.json(doc["fields"])
+
+            with st.expander(f"✅ `{doc_type}` → `{file.name}`: View Extracted Fields"):
+                st.json(doc["fields"])
         except Exception as e:
             st.warning(f"⚠️ Could not process `{file.name}`: {e}")
 
-    # Add dummy reference data
     documents["reference"] = {
         "approved_vendors": ["generic", "TechSupply Inc."],
         "allowed_currencies": ["AED", "USD"]
     }
 
-    try:
-        st.subheader("📜 Parsed Rule")
-        rule = parse_natural_rule(user_instruction)
-        st.json(rule)
+    st.header("🧠 Step 2: Multi-Rule Evaluation")
+    lines = [line.strip() for line in user_instruction.strip().split("\n") if line.strip()]
+    results = []
+    pass_count = fail_count = error_count = 0
 
-        required_docs = set(rule["applies_to"])
-        missing_docs = required_docs - set(documents.keys())
-        if missing_docs:
-            st.warning(f"🚫 Missing required documents: {', '.join(missing_docs)}")
-            st.stop()
+    for idx, line in enumerate(lines):
+        st.markdown(f"### 🔍 Rule {idx+1}: `{line}`")
+        try:
+            rule = parse_natural_rule(line)
+            required_docs = set(rule["applies_to"])
+            missing_docs = required_docs - set(documents.keys())
+            if missing_docs:
+                st.warning(f"🚫 Skipped (Missing docs): {', '.join(missing_docs)}")
+                error_count += 1
+                continue
 
-        st.subheader("🔎 Rule Evaluation")
-        result = evaluate_rule(rule, documents, enable_llm=True)
+            result = evaluate_rule(rule, documents, enable_llm=True)
+            results.append(result)
 
-        if result["result"] == "fail":
-            st.error(f"❌ Rule Failed: {result['reason']}")
-            if "llm_commentary" in result:
-                st.info(f"🧠 LLM Insight:\n{result['llm_commentary']}")
-        else:
-            st.success("✅ Rule Passed")
+            if result["result"] == "fail":
+                st.error(f"❌ FAILED – {result['reason']}")
+                fail_count += 1
+                if "llm_commentary" in result:
+                    st.info(f"🧠 LLM Insight: {result['llm_commentary']}")
+            else:
+                st.success("✅ PASSED")
+                pass_count += 1
 
-        st.subheader("📌 Evaluation Details")
-        st.json(result["details"])
+            with st.expander("📌 Evaluation Details"):
+                st.json(result["details"])
 
-        report = generate_compliance_report(documents, [result])
-        st.subheader("📄 Final Compliance Report")
-        st.markdown(report)
-        st.download_button("Download Report", report, file_name="compliance_report.md")
+        except Exception as e:
+            st.error(f"⚠️ Rule could not be evaluated: {e}")
+            error_count += 1
 
-    except Exception as e:
-        st.error(f"🚨 An error occurred during rule evaluation: {e}")
+    st.session_state.rule_results = results
+    st.session_state.documents_snapshot = documents
+    st.info(f"📊 Summary: ✅ Passed: {pass_count} | ❌ Failed: {fail_count} | ⚠️ Errors/Skipped: {error_count}")
+
+if st.session_state.get("rule_results"):
+    st.header("📄 Final Compliance Report")
+    report = generate_compliance_report(
+        st.session_state.documents_snapshot, st.session_state.rule_results
+    )
+    st.markdown(report)
+    st.download_button("⬇️ Download Report", report, file_name="compliance_report.md")
