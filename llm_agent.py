@@ -1,11 +1,11 @@
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 import os
+from dotenv import load_dotenv
 
 # Load your OpenAI API key from environment or set directly
-os.environ["OPENAI_API_KEY"] = "your-api-key-here"  # Replace or load securely
-
-llm = ChatOpenAI(temperature=0, model="gpt-4")
+load_dotenv()
+llm = ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 def llm_explain_failure(rule, values, documents) -> str:
     rule_text = rule.get("description", rule["rule_id"])
@@ -23,13 +23,3 @@ def llm_explain_failure(rule, values, documents) -> str:
     """
     response = llm([HumanMessage(content=prompt)])
     return response.content
-
-# Example usage:
-# result = {
-#     "rule_id": "LOOKUP_001",
-#     "result": "fail",
-#     "reason": "Vendor is not on the approved vendor list",
-#     "details": {"invoice.vendor_id": None, "reference.approved_vendors": ["generic"]}
-# }
-# explanation = llm_explain_failure(rule, result["details"], documents)
-# print(explanation)
