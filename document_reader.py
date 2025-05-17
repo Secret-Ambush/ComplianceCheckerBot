@@ -4,6 +4,11 @@ import pytesseract
 import pdfplumber
 import cv2
 from pathlib import Path
+from langchain.chat_models import ChatOpenAI
+from langchain.schema import HumanMessage
+import os
+
+llm = ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
 
 def extract_text_from_pdf(pdf_path):
     with pdfplumber.open(pdf_path) as pdf:
@@ -18,13 +23,35 @@ def extract_text_with_ocr(image_path):
 def classify_document(text, filename):
     name = filename.lower()
     text = text.lower()
-    if "invoice" in name or re.search(r"invoice\s*number", text):
+    if "invoice" in name or re.search(r"invoice\\s*number", text):
         return "invoice"
-    if "po" in name or "purchase order" in text:
+    if "purchase order" in text:
         return "purchase_order"
     if "grn" in name or "goods received" in text:
         return "grn"
-    return "unknown"
+
+    # Fallback to LLM
+    prompt = f"""
+    The following is raw OCR or extracted text from a scanned business document.
+
+    Classify the document type as one of the following:
+    - invoice
+    - purchase_order
+    - grn
+    - unknown
+
+    Do not explain, just respond with one word from the list above.
+
+    ---
+    {text[:3000]}
+    ---
+    """
+    try:
+        response = llm([HumanMessage(content=prompt)])
+        result = response.content.strip().lower()
+        return result if result in ["invoice", "purchase_order", "grn"] else "unknown"
+    except Exception:
+        return "unknown"
 
 def detect_vendor(text, filename):
     if "abc corp" in text.lower():
@@ -52,6 +79,14 @@ def extract_fields_regex(text):
     currency_match = re.search(r"Currency\s*:\s*([A-Z]{3})", text)
     if currency_match:
         fields["currency"] = currency_match.group(1)
+        
+    quantity_match = re.search(r"Quantity\s*:\s*([0-9]+)", text, re.IGNORECASE)
+    if quantity_match:
+        fields["quantity"] = quantity_match.group(1)
+
+    price_match = re.search(r"Unit\s*Price\s*:\s*([0-9]+\.[0-9]{2})", text, re.IGNORECASE)
+    if price_match:
+        fields["unit_price"] = price_match.group(1)
 
     total_match = re.search(r"Total Amount \\(Including\\s+VAT\\)\s*:\s*([0-9]+\.[0-9]{2})", text)
     if not total_match:
@@ -85,7 +120,3 @@ def process_document(file_path):
         "vendor": vendor,
         "fields": fields
     }
-
-# Example usage:
-result = process_document(Path("invoice (1).PDF"))
-print(result)
