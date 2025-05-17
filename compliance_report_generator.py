@@ -1,9 +1,7 @@
 def generate_compliance_report(documents, results):
     lines = []
-    lines.append("# 📋 Compliance Report\n")
-
     # Matched documents
-    lines.append("## 📎 Matched Documents:")
+    lines.append("### 📎 Matched Documents:")
     for doc_type, doc in documents.items():
         if doc_type == "reference":
             continue
@@ -12,7 +10,7 @@ def generate_compliance_report(documents, results):
     lines.append("\n---\n")
 
     # Rule Results
-    lines.append("## ✅❌ Rule Evaluation Summary:")
+    lines.append("## Rule Evaluation Summary:")
     passed = failed = 0
 
     for res in results:

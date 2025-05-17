@@ -28,31 +28,6 @@ This project is an AI-powered agent that automates document compliance workflows
 
 ---
 
-## 🚀 How to Run
-
-### 📦 Prerequisites
-
-- Python 3.8+
-- Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-- Set your OpenAI API key:
-
-```bash
-export OPENAI_API_KEY=your-api-key
-```
-
-### ▶️ Run the Streamlit App
-
-```bash
-streamlit run compliance_checker_app.py
-```
-
----
-
 ## 📝 Example Use
 
 ### Upload:
@@ -70,45 +45,8 @@ streamlit run compliance_checker_app.py
 
 ---
 
-## 📁 Sample Folder Structure
-
-```
-├── compliance_checker_app.py
-├── compliance_agent.py
-├── document_reader.py
-├── llm_agent.py
-├── nl_rule_parser.py
-├── compliance_report_generator.py
-├── compliance_rules.json
-├── requirements.txt
-└── README.md
-```
-
----
-
-## ⚠️ Known Limitations
-
-- One natural language rule per query (batch input optional)
-- No visual parsing of tables (future improvement)
-- Document classification is layout- and keyword-based (not ML)
-
----
-
-## 🛠 Future Improvements
-
-- Add document grouping by `po_number`
-- Support table row-wise validation (e.g., line item quantity/price)
-- Add LLM-based document classification fallback
-- Integrate with cloud OCR APIs (Azure Form Recognizer, etc.)
-
----
-
-## 📬 Submission
-
-To submit:
-1. Push this project to a public GitHub repository
-2. Share the link by replying to the challenge email
-
----
-
 Made with ❤️ for the Al Shirawi Intelligent Compliance Agent Challenge.
+
+---
+
+![alt text](<Screenshot 2025-05-17 at 11.18.38 pm.png>)

@@ -44,3 +44,21 @@ Planning
 
 
 
+---
+
+## ⚠️ Known Limitations
+
+- One natural language rule per query (batch input optional)
+- No visual parsing of tables (future improvement)
+- Document classification is layout- and keyword-based (not ML)
+
+---
+
+## 🛠 Future Improvements
+
+- Add document grouping by `po_number`
+- Support table row-wise validation (e.g., line item quantity/price)
+- Add LLM-based document classification fallback
+- Integrate with cloud OCR APIs (Azure Form Recognizer, etc.)
+
+---
