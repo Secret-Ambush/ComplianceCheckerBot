@@ -6,17 +6,36 @@ def get_nested_value(documents: Dict[str, Any], path: str) -> Any:
     parts = path.split('.')
     current = documents
     for i, part in enumerate(parts):
-        if part in current:
-            current = current[part]
-        elif i == 1 and "fields" in current:
-            current = current["fields"]
+        if isinstance(current, dict):
             if part in current:
                 current = current[part]
+            elif "fields" in current and part in current["fields"]:
+                current = current["fields"][part]
             else:
+                return None
+        elif isinstance(current, list):
+            if part == '*':
+                return current  # wildcard for aggregation
+            try:
+                idx = int(part)
+                current = current[idx]
+            except (ValueError, IndexError):
                 return None
         else:
             return None
     return current
+
+def aggregate_values(data: List[Dict[str, Any]], field: str, agg_type="sum") -> Union[float, None]:
+    try:
+        values = [float(row.get(field, 0)) for row in data if field in row]
+        if agg_type == "sum":
+            return sum(values)
+        elif agg_type == "max":
+            return max(values)
+        elif agg_type == "min":
+            return min(values)
+    except Exception:
+        return None
 
 def compare_values(a: Any, b: Any, check_type: str, parameters: Dict[str, Any] = None) -> bool:
     try:
@@ -55,16 +74,19 @@ def evaluate_rule(rule: Dict[str, Any], documents: Dict[str, Dict[str, Any]], en
         a_path, b_path = list(fields.items())[0]
         a_value = get_nested_value(documents, a_path)
 
-        # Determine b_value as path, reference, number, or literal
         if isinstance(b_path, (int, float)):
             b_value = b_path
         elif isinstance(b_path, str):
-            if "." in b_path and not b_path.startswith("reference."):
+            if "[*]" in b_path:
+                list_path, field = b_path.split("[*].")
+                list_data = get_nested_value(documents, list_path)
+                b_value = aggregate_values(list_data, field, "sum")
+            elif "." in b_path and not b_path.startswith("reference."):
                 b_value = get_nested_value(documents, b_path)
             elif b_path.startswith("reference."):
                 b_value = documents.get("reference", {}).get(b_path.split('.')[-1], [])
             else:
-                b_value = b_path  # Treat as literal string
+                b_value = b_path  # literal
         else:
             b_value = None
 
@@ -81,7 +103,8 @@ def evaluate_rule(rule: Dict[str, Any], documents: Dict[str, Dict[str, Any]], en
 
     if not result and enable_llm:
         try:
-            result_obj["llm_commentary"] = llm_explain_failure(rule, values, documents)
+            # result_obj["llm_commentary"] = llm_explain_failure(rule, values, documents)
+            pass
         except Exception as e:
             result_obj["llm_commentary"] = f"LLM explanation unavailable: {e}"
 

@@ -24,15 +24,23 @@ with st.sidebar:
     """)
     st.info("Uses GPT-4 + Rule Engine", icon="📎")
 
+    use_file_rules = st.checkbox("📄 Use predefined JSON rules", value=False)
+
+    if not use_file_rules:
+        user_instruction = st.text_area("💬 Enter one or more natural language rules (one per line):", height=150)
+    else:
+        st.markdown("✅ Using `compliance_rules.json` from disk.")
+        with open("compliance_rules.json") as f:
+            predefined_rules = json.load(f)
+
 st.title("📄 Compliance Checker Agent")
 
 uploaded_files = st.file_uploader("📁 Upload one or more documents", accept_multiple_files=True)
-user_instruction = st.text_area("💬 Enter one or more natural language rules (one per line):", height=150)
 
 if "rule_results" not in st.session_state:
     st.session_state.rule_results = []
 
-if st.button("▶️ Run Compliance Check") and uploaded_files and user_instruction:
+if st.button("▶️ Run Compliance Check") and uploaded_files:
     st.header("🧾 Step 1: Document Parsing")
     documents = {}
     for file in uploaded_files:
@@ -47,7 +55,11 @@ if st.button("▶️ Run Compliance Check") and uploaded_files and user_instruct
             documents[doc_type] = doc
 
             with st.expander(f"✅ `{doc_type}` → `{file.name}`: View Extracted Fields"):
+                st.subheader("📋 Fields")
                 st.json(doc["fields"])
+                if "tables_structured" in doc:
+                    st.subheader("📦 Line Items")
+                    st.table(doc["tables_structured"])
         except Exception as e:
             st.warning(f"⚠️ Could not process `{file.name}`: {e}")
 
@@ -57,14 +69,18 @@ if st.button("▶️ Run Compliance Check") and uploaded_files and user_instruct
     }
 
     st.header("🧠 Step 2: Multi-Rule Evaluation")
-    lines = [line.strip() for line in user_instruction.strip().split("\n") if line.strip()]
     results = []
     pass_count = fail_count = error_count = 0
 
-    for idx, line in enumerate(lines):
-        st.markdown(f"### 🔍 Rule {idx+1}: `{line}`")
+    if use_file_rules:
+        rules = predefined_rules
+    else:
+        lines = [line.strip() for line in user_instruction.strip().split("\n") if line.strip()]
+        rules = [parse_natural_rule(line) for line in lines]
+
+    for idx, rule in enumerate(rules):
+        st.markdown(f"### 🔍 Rule {idx+1}: `{rule.get('description', rule.get('rule_id', 'Rule'))}`")
         try:
-            rule = parse_natural_rule(line)
             required_docs = set(rule["applies_to"])
             missing_docs = required_docs - set(documents.keys())
             if missing_docs:
@@ -86,6 +102,9 @@ if st.button("▶️ Run Compliance Check") and uploaded_files and user_instruct
 
             with st.expander("📌 Evaluation Details"):
                 st.json(result["details"])
+
+            with st.expander("🧩 Full Rule JSON"):
+                st.json(rule)
 
         except Exception as e:
             st.error(f"⚠️ Rule could not be evaluated: {e}")
