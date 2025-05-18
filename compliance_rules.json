@@ -92,5 +92,18 @@
         },
         "check_type": "less_than_or_equal",
         "on_fail": "Total invoice amount exceeds the permitted threshold"
-    }
+    },
+    {
+        "rule_id": "TABLE_SUM_CHECK_001",
+        "description": "Sum of line item totals must equal invoice total",
+        "applies_to": ["invoice"],
+        "fields": {
+            "invoice.fields.total_amount": "invoice.tables_structured[*].total"
+        },
+        "check_type": "tolerance",
+        "parameters": {
+            "tolerance_percent": 1
+        },
+        "on_fail": "Sum of line item totals does not match invoice total"
+    }    
 ]
