@@ -3,9 +3,8 @@ import tempfile
 import os
 import json
 from pathlib import Path
-from document_reader import process_document
 from nl_rule_parser import parse_natural_rule
-from compliance_agent import evaluate_rule
+from crew_runner import run_crew_pipeline
 from compliance_report_generator import generate_compliance_report
 
 st.set_page_config(page_title="Compliance Checker Agent", page_icon="📄", layout="centered")
@@ -50,16 +49,9 @@ if st.button("▶️ Run Compliance Check") and uploaded_files:
             tmp_path = tmp_file.name
 
         try:
-            doc = process_document(Path(tmp_path))
-            doc_type = doc["doc_type"]
-            documents[doc_type] = doc
-
-            with st.expander(f"✅ `{doc_type}` → `{file.name}`: View Extracted Fields"):
-                st.subheader("📋 Fields")
-                st.json(doc["fields"])
-                if "tables_structured" in doc:
-                    st.subheader("📦 Line Items")
-                    st.table(doc["tables_structured"])
+            doc_type = Path(file.name).stem.lower()
+            with st.expander(f"📄 `{doc_type}` uploaded"):
+                st.info(f"📎 Will be parsed via CrewAI pipeline.")
         except Exception as e:
             st.warning(f"⚠️ Could not process `{file.name}`: {e}")
 
@@ -78,39 +70,32 @@ if st.button("▶️ Run Compliance Check") and uploaded_files:
         lines = [line.strip() for line in user_instruction.strip().split("\n") if line.strip()]
         rules = [parse_natural_rule(line) for line in lines]
 
-    for idx, rule in enumerate(rules):
-        st.markdown(f"### 🔍 Rule {idx+1}: `{rule.get('description', rule.get('rule_id', 'Rule'))}`")
-        try:
-            required_docs = set(rule["applies_to"])
-            missing_docs = required_docs - set(documents.keys())
-            if missing_docs:
-                st.warning(f"🚫 Skipped (Missing docs): {', '.join(missing_docs)}")
-                error_count += 1
-                continue
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp_json:
+        tmp_file = uploaded_files[0]
+        suffix = Path(tmp_file.name).suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
+            temp.write(tmp_file.read())
+            primary_path = temp.name
 
-            result = evaluate_rule(rule, documents, enable_llm=True)
-            results.append(result)
+    parsed_output, rule_results = run_crew_pipeline(
+    file_path=primary_path,
+    rules_json=json.dumps(rules),
+    log_fn=lambda msg: st.markdown(f"> {msg}")
+    )
 
-            if result["result"] == "fail":
-                st.error(f"❌ FAILED – {result['reason']}")
-                fail_count += 1
-                if "llm_commentary" in result:
-                    st.info(f"🧠 LLM Insight: {result['llm_commentary']}")
-            else:
-                st.success("✅ PASSED")
-                pass_count += 1
+    # Display results
+    for idx, result in enumerate(rule_results):
+        st.markdown(f"### 🔍 Rule {idx+1}: `{result.get('rule_id', 'Unknown')}`")
+        if result["result"] == "fail":
+            st.error(f"❌ FAILED - {result['reason']}")
+            st.info(f"🧠 LLM Insight: {result.get('llm_commentary')}")
+        else:
+            st.success("✅ PASSED")
 
-            with st.expander("📌 Evaluation Details"):
-                st.json(result["details"])
+        with st.expander("📌 Evaluation Details"):
+            st.json(result["details"])
 
-            with st.expander("🧩 Full Rule JSON"):
-                st.json(rule)
-
-        except Exception as e:
-            st.error(f"⚠️ Rule could not be evaluated: {e}")
-            error_count += 1
-
-    st.session_state.rule_results = results
+    st.session_state.rule_results = rule_results
     st.session_state.documents_snapshot = documents
     st.info(f"📊 Summary: ✅ Passed: {pass_count} | ❌ Failed: {fail_count} | ⚠️ Errors/Skipped: {error_count}")
 
