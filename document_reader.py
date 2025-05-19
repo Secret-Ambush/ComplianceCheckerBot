@@ -6,12 +6,365 @@ import numpy as np
 from PIL import Image
 from pathlib import Path
 from langchain.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage
+from langchain.schema import HumanMessage, SystemMessage
 import os
 from dotenv import load_dotenv
+import pdf2image
+from typing import Dict, Any, List, Optional, Tuple
+import logging
+from pdf2image.exceptions import PDFInfoNotInstalledError
 
 load_dotenv()
 llm = ChatOpenAI(temperature=0, model="gpt-4", openai_api_key=os.getenv("OPENAI_API_KEY"))
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class DocumentProcessor:
+    def __init__(self):
+        # Configure Tesseract with more options
+        self.psm_modes = [3, 4, 6, 11, 12]  # Added more PSM modes
+        self.ocr_settings = {
+            'lang': 'eng',
+            'config': '--oem 3'  # Use LSTM OCR Engine Mode
+        }
+        
+        # LLM prompts
+        self.llm_prompts = {
+            'enhance_text': """You are an expert at understanding and correcting OCR text from business documents.
+            Given the raw OCR text, your task is to:
+            1. Correct any obvious OCR mistakes
+            2. Fix formatting issues
+            3. Maintain the original structure
+            4. Preserve numbers and special characters
+            5. Keep the original line breaks where they make sense
+            
+            Return the enhanced text exactly as it should appear in the document.
+            Do not add explanations or notes.""",
+            
+            'extract_fields': """You are an expert at extracting structured information from business documents.
+            Given the text, extract the following fields if present:
+            - Invoice Number
+            - PO Number
+            - Date
+            - Vendor Name
+            - Total Amount
+            - Currency
+            - Line Items (as a list of dictionaries with item, quantity, unit price, and total)
+            
+            Return the information in a structured format.""",
+            
+            'validate_table': """You are an expert at understanding and validating table structures in business documents.
+            Given the raw table text, your task is to:
+            1. Identify the table structure
+            2. Correct any misaligned columns
+            3. Fix any OCR mistakes in the data
+            4. Ensure numbers are properly formatted
+            5. Maintain the original table layout
+            
+            Return the corrected table text."""
+        }
+
+    def preprocess_image(self, image: np.ndarray) -> List[np.ndarray]:
+        """Apply various preprocessing techniques to improve OCR accuracy."""
+        processed_images = []
+        
+        # Original image
+        processed_images.append(image)
+        
+        # Grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        processed_images.append(gray)
+        
+        # Adaptive thresholding
+        thresh = cv2.adaptiveThreshold(
+            gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY, 11, 2
+        )
+        processed_images.append(thresh)
+        
+        # Denoising
+        denoised = cv2.fastNlMeansDenoising(gray)
+        processed_images.append(denoised)
+        
+        # Increase contrast
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        processed_images.append(enhanced)
+        
+        # Inverted
+        inverted = cv2.bitwise_not(gray)
+        processed_images.append(inverted)
+        
+        return processed_images
+
+    def enhance_text_with_llm(self, text: str) -> str:
+        """Use LLM to enhance and correct OCR text."""
+        try:
+            messages = [
+                SystemMessage(content=self.llm_prompts['enhance_text']),
+                HumanMessage(content=f"Here is the raw OCR text:\n\n{text}")
+            ]
+            response = llm.invoke(messages)
+            return response.content.strip()
+        except Exception as e:
+            logger.warning(f"LLM text enhancement failed: {str(e)}")
+            return text
+
+    def extract_structured_fields(self, text: str) -> Dict[str, Any]:
+        """Use LLM to extract structured fields from text."""
+        try:
+            messages = [
+                SystemMessage(content=self.llm_prompts['extract_fields']),
+                HumanMessage(content=f"Here is the document text:\n\n{text}")
+            ]
+            response = llm.invoke(messages)
+            # Parse the response as JSON
+            import json
+            return json.loads(response.content)
+        except Exception as e:
+            logger.warning(f"LLM field extraction failed: {str(e)}")
+            return {}
+
+    def validate_table_with_llm(self, table_text: str) -> str:
+        """Use LLM to validate and correct table structure."""
+        try:
+            messages = [
+                SystemMessage(content=self.llm_prompts['validate_table']),
+                HumanMessage(content=f"Here is the raw table text:\n\n{table_text}")
+            ]
+            response = llm.invoke(messages)
+            return response.content.strip()
+        except Exception as e:
+            logger.warning(f"LLM table validation failed: {str(e)}")
+            return table_text
+
+    def extract_text_from_image(self, image: np.ndarray) -> Tuple[str, Dict[str, Any]]:
+        """Extract text from an image using OCR and enhance with LLM."""
+        logger.info("Starting OCR extraction...")
+        
+        # Get initial OCR text
+        texts = []
+        processed_images = self.preprocess_image(image)
+        
+        for img in processed_images:
+            for psm in self.psm_modes:
+                try:
+                    config = f'--oem 3 --psm {psm}'
+                    logger.info(f"Trying OCR with PSM mode {psm}")
+                    
+                    text = pytesseract.image_to_string(
+                        img, 
+                        lang=self.ocr_settings['lang'],
+                        config=config
+                    )
+                    
+                    if text.strip():
+                        logger.info(f"Found text with PSM {psm}, length: {len(text)}")
+                        texts.append(text)
+                except Exception as e:
+                    logger.warning(f"OCR attempt failed with PSM {psm}: {str(e)}")
+                    continue
+        
+        if not texts:
+            logger.warning("No text extracted from image")
+            return "", {}
+        
+        # Get the best OCR result
+        best_text = max(texts, key=len)
+        logger.info(f"Best OCR result length: {len(best_text)}")
+        
+        # Enhance text with LLM
+        try:
+            enhanced_text = self.enhance_text_with_llm(best_text)
+            logger.info("Text enhanced with LLM")
+        except Exception as e:
+            logger.warning(f"LLM enhancement failed: {str(e)}")
+            enhanced_text = best_text
+        
+        # Extract structured fields
+        try:
+            structured_fields = self.extract_structured_fields(enhanced_text)
+            logger.info(f"Extracted {len(structured_fields)} structured fields")
+        except Exception as e:
+            logger.warning(f"Field extraction failed: {str(e)}")
+            structured_fields = {}
+        
+        return enhanced_text, structured_fields
+
+    def process_pdf(self, pdf_path: str) -> List[np.ndarray]:
+        """Convert PDF to images with better error handling."""
+        try:
+            logger.info(f"Converting PDF: {pdf_path}")
+            images = pdf2image.convert_from_path(
+                pdf_path,
+                dpi=300,  # Higher DPI for better quality
+                thread_count=4  # Use multiple threads
+            )
+            logger.info(f"Converted PDF to {len(images)} images")
+            return images
+        except PDFInfoNotInstalledError:
+            logger.error("pdf2image requires poppler to be installed")
+            raise
+        except Exception as e:
+            logger.error(f"Error converting PDF: {str(e)}")
+            raise
+
+    def extract_tables(self, image: np.ndarray) -> List[Dict[str, Any]]:
+        """Extract tables from the image."""
+        # Convert image to grayscale
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        
+        # Apply thresholding
+        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+        
+        # Find contours
+        contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        
+        tables = []
+        for contour in contours:
+            x, y, w, h = cv2.boundingRect(contour)
+            if w > 100 and h > 100:  # Filter small contours
+                roi = image[y:y+h, x:x+w]
+                table_text = self.extract_text_from_image(roi)[0]
+                if table_text.strip():
+                    tables.append({
+                        'text': table_text,
+                        'position': {'x': x, 'y': y, 'width': w, 'height': h}
+                    })
+        
+        return tables
+
+    def process_document(self, file_path: str) -> Dict[str, Any]:
+        """Process a document and extract text, tables, and structured fields."""
+        file_path = Path(file_path)
+        logger.info(f"Processing document: {file_path}")
+        
+        result = {
+            'text': '',
+            'tables': [],
+            'structured_fields': {},
+            'metadata': {
+                'filename': file_path.name,
+                'file_type': file_path.suffix.lower()
+            }
+        }
+        
+        try:
+            if file_path.suffix.lower() == '.pdf':
+                # Try pdfplumber first
+                try:
+                    with pdfplumber.open(file_path) as pdf:
+                        text_all = []
+                        for page in pdf.pages:
+                            text = page.extract_text()
+                            if text and text.strip():
+                                text_all.append(text)
+                        if text_all:
+                            result['text'] = "\n".join(text_all)
+                            logger.info("Successfully extracted text using pdfplumber")
+                except Exception as e:
+                    logger.warning(f"pdfplumber extraction failed: {str(e)}")
+                
+                # If pdfplumber failed, try OCR
+                if not result['text']:
+                    logger.info("Falling back to OCR processing")
+                    images = self.process_pdf(str(file_path))
+                    for i, image in enumerate(images):
+                        logger.info(f"Processing page {i+1}")
+                        # Convert PIL Image to numpy array
+                        img_array = np.array(image)
+                        # Convert RGB to BGR (OpenCV format)
+                        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                        
+                        # Extract text and structured fields
+                        page_text, page_fields = self.extract_text_from_image(img_array)
+                        if page_text:
+                            result['text'] += f"\n--- Page {i+1} ---\n{page_text}"
+                            result['structured_fields'].update(page_fields)
+                        
+                        # Extract and validate tables
+                        tables = self.extract_tables(img_array)
+                        for table in tables:
+                            validated_table = self.validate_table_with_llm(table['text'])
+                            table['text'] = validated_table
+                        result['tables'].extend(tables)
+            
+            else:
+                # Process image
+                image = cv2.imread(str(file_path))
+                if image is None:
+                    raise ValueError(f"Could not read image: {file_path}")
+                
+                # Extract text and structured fields
+                result['text'], result['structured_fields'] = self.extract_text_from_image(image)
+                
+                # Extract and validate tables
+                tables = self.extract_tables(image)
+                for table in tables:
+                    validated_table = self.validate_table_with_llm(table['text'])
+                    table['text'] = validated_table
+                result['tables'] = tables
+            
+            # If still no text, try direct OCR
+            if not result['text']:
+                logger.warning("No text extracted, trying direct OCR")
+                if file_path.suffix.lower() == '.pdf':
+                    result['text'] = extract_text_from_pdf_with_ocr_fallback(str(file_path))
+                else:
+                    result['text'] = extract_text_with_ocr(str(file_path))
+            
+            logger.info(f"Document processing complete. Text length: {len(result['text'])}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error processing document {file_path}: {str(e)}")
+            raise
+
+def process_document(file_path: str) -> Dict[str, Any]:
+    """Main function to process a document."""
+    processor = DocumentProcessor()
+    result = processor.process_document(file_path)
+    
+    # Ensure we have the basic structure
+    if not isinstance(result, dict):
+        result = {}
+    
+    # Add required fields if missing
+    result.setdefault('filename', Path(file_path).name)
+    result.setdefault('doc_type', 'unknown')
+    result.setdefault('vendor', 'generic')
+    result.setdefault('fields', {})
+    result.setdefault('tables_raw', [])
+    result.setdefault('tables_structured', [])
+    
+    # If we have structured fields from LLM, merge them into fields
+    if 'structured_fields' in result:
+        result['fields'].update(result['structured_fields'])
+        del result['structured_fields']
+    
+    # If we have text but no fields, try to extract fields using regex
+    if result['text'] and not result['fields']:
+        result['fields'] = extract_fields_regex(result['text'])
+    
+    # If we have text but no doc_type, try to classify
+    if result['text'] and result['doc_type'] == 'unknown':
+        result['doc_type'] = classify_document(result['text'], result['filename'])
+    
+    # If we have text but no vendor, try to detect
+    if result['text'] and result['vendor'] == 'generic':
+        result['vendor'] = detect_vendor(result['text'], result['filename'])
+    
+    # Process tables if we have them
+    if result['tables_raw']:
+        for table in result['tables_raw']:
+            if isinstance(table, dict) and 'text' in table:
+                structured_table = parse_ocr_table(table['text'])
+                if structured_table:
+                    result['tables_structured'].extend(structured_table)
+    
+    return result
 
 # --- OCR Functions
 def extract_text_from_pdf_with_ocr_fallback(pdf_path):
@@ -189,41 +542,3 @@ def extract_fields_regex(text):
         fields["total_amount"] = total_match.group(1)
 
     return fields
-
-# --- Main interface function
-def process_document(file_path):
-    ext = file_path.suffix.lower()
-    text = ""
-    tables = []
-
-    if ext == ".pdf":
-        text = extract_text_from_pdf_with_ocr_fallback(file_path)
-        tables = []  # No direct table extraction yet for PDF pages
-    elif ext in [".png", ".jpg", ".jpeg"]:
-        text = extract_text_with_ocr(file_path)
-        try:
-            tables = extract_tables_from_scanned_image(file_path)
-        except Exception:
-            tables = []
-    elif ext == ".txt":
-        text = Path(file_path).read_text()
-        tables = []
-    else:
-        raise ValueError(f"Unsupported file type: {ext}")
-
-    structured_table = []
-    for table_text in tables:
-        structured_table.extend(parse_ocr_table(table_text))
-
-    doc_type = classify_document(text, file_path.name)
-    vendor = detect_vendor(text, file_path.name)
-    fields = extract_fields_regex(text)
-
-    return {
-        "filename": file_path.name,
-        "doc_type": doc_type,
-        "vendor": vendor,
-        "fields": fields,
-        "tables_raw": tables,
-        "tables_structured": structured_table
-    }
