@@ -1,0 +1,3 @@
+- check out how to optimise crew (don't intialise it multiple times)
+- check how to handle json in a better manner
+- finally!!! support cross documents
