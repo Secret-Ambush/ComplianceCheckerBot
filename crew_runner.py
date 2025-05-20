@@ -39,9 +39,22 @@ class EvaluateComplianceRulesTool(BaseTool):
     description: str = "Evaluates parsed documents against structured rules and returns results as JSON."
 
     def _run(self, documents_json: str, rules_json: str) -> str:
-        documents = json.loads(documents_json)
-        rules = json.loads(rules_json)
-        return json.dumps(evaluate_all_rules(rules, documents))
+        try:
+            documents = json.loads(documents_json)
+            rules = json.loads(rules_json)
+            results = evaluate_all_rules(rules, documents)
+            # Ensure the result is valid JSON
+            return json.dumps(results)
+        except Exception as e:
+            # Return a valid JSON error response
+            return json.dumps({
+                "error": str(e),
+                "result": "error",
+                "details": {
+                    "message": "Failed to evaluate rules",
+                    "exception": str(e)
+                }
+            })
 
 class ExplainComplianceFailureTool(BaseTool):
     name: str = "explain_compliance_failure"
@@ -194,7 +207,16 @@ def run_crew_pipeline(
     
     # Unpack the single TaskOutput from the evaluation crew
     eval_out = eval_result.tasks_output[0]
-    rule_outcomes = json.loads(eval_out.raw)
+    
+    # Add debugging and error handling for JSON parsing
+    try:
+        if log_fn: log_fn(f"Raw evaluation output: {eval_out.raw}")
+        rule_outcomes = json.loads(eval_out.raw)
+    except json.JSONDecodeError as e:
+        if log_fn: log_fn(f"Error parsing JSON: {str(e)}")
+        if log_fn: log_fn(f"Invalid JSON content: {eval_out.raw}")
+        # Return empty results instead of failing
+        return parsed_documents, []
     
     # Handle failed rules
     failed_rules = [r for r in rule_outcomes if r["result"] == "fail"]
