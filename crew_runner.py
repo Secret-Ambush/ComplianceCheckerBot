@@ -7,14 +7,77 @@ from pathlib import Path
 import json
 from functools import lru_cache
 from typing import Dict, List, Any
+import tempfile
+import os
 
 # --- CrewAI-Compatible Tool Classes ---
 class ExtractAndParseDocumentTool(BaseTool):
     name: str = "extract_and_parse_document"
     description: str = "Extracts fields and tables from a business document and returns structured JSON."
 
-    def _run(self, file_path: str) -> str:
-        return json.dumps(process_document(Path(file_path)))
+    def _run(self, file_paths: str) -> str:
+        if not file_paths or not isinstance(file_paths, str):
+            return json.dumps({
+                "error": "Invalid input: file_paths must be a non-empty string",
+                "input": file_paths
+            })
+        try:
+            paths = json.loads(file_paths)
+            if not paths:
+                return json.dumps({"error": "No file paths provided"})
+            
+            # Process each document
+            results = {}
+            for doc_type, file_path in paths.items():
+                try:
+                    # Verify file exists
+                    path = Path(file_path)
+                    if not path.exists():
+                        results[doc_type] = {
+                            "error": f"File not found: {file_path}",
+                            "fields": {},
+                            "tables": []
+                        }
+                        continue
+                    
+                    # Process the document
+                    doc_result = process_document(path)
+                    if not doc_result:
+                        results[doc_type] = {
+                            "error": f"Failed to process document: {file_path}",
+                            "fields": {},
+                            "tables": []
+                        }
+                        continue
+                        
+                    results[doc_type] = doc_result
+                    
+                except Exception as e:
+                    results[doc_type] = {
+                        "error": f"Error processing {doc_type}: {str(e)}",
+                        "fields": {},
+                        "tables": []
+                    }
+            
+            # Ensure we have at least one successfully processed document
+            if not any("error" not in result for result in results.values()):
+                return json.dumps(results)
+            
+            return json.dumps({
+                "error": "No documents were successfully processed",
+                "details": results
+            })
+            
+        except json.JSONDecodeError as e:
+            return json.dumps({
+                "error": f"Invalid JSON input: {str(e)}",
+                "input": file_paths
+            })
+        except Exception as e:
+            return json.dumps({
+                "error": f"Unexpected error: {str(e)}",
+                "input": file_paths
+            })
 
 class MatchDocumentsTool(BaseTool):
     name: str = "match_documents"
@@ -22,16 +85,66 @@ class MatchDocumentsTool(BaseTool):
 
     def _run(self, documents_json: str) -> str:
         documents = json.loads(documents_json)
-        # Implement document matching logic here
-        # For now, return a simple structure
+        matches = []
+        
+        # Extract key fields for matching
+        key_fields = {
+            'po_number': ['po_number', 'purchase_order_number', 'po'],
+            'invoice_number': ['invoice_number', 'invoice_no', 'inv_number'],
+            'delivery_ref': ['delivery_ref', 'grn_number', 'delivery_reference']
+        }
+        
+        # Find matching documents
+        for doc_type, doc in documents.items():
+            if doc_type == 'reference':
+                continue
+                
+            # Extract fields from the document
+            fields = doc.get('fields', {})
+            
+            # Try to match with other documents
+            for other_type, other_doc in documents.items():
+                if other_type == doc_type or other_type == 'reference':
+                    continue
+                    
+                other_fields = other_doc.get('fields', {})
+                
+                # Check for matching PO numbers
+                for po_field in key_fields['po_number']:
+                    if po_field in fields and po_field in other_fields:
+                        if fields[po_field] == other_fields[po_field]:
+                            matches.append({
+                                'primary': doc_type,
+                                'related': other_type,
+                                'key': 'po_number',
+                                'value': fields[po_field]
+                            })
+                
+                # Check for matching invoice numbers
+                for inv_field in key_fields['invoice_number']:
+                    if inv_field in fields and inv_field in other_fields:
+                        if fields[inv_field] == other_fields[inv_field]:
+                            matches.append({
+                                'primary': doc_type,
+                                'related': other_type,
+                                'key': 'invoice_number',
+                                'value': fields[inv_field]
+                            })
+                
+                # Check for matching delivery references
+                for ref_field in key_fields['delivery_ref']:
+                    if ref_field in fields and ref_field in other_fields:
+                        if fields[ref_field] == other_fields[ref_field]:
+                            matches.append({
+                                'primary': doc_type,
+                                'related': other_type,
+                                'key': 'delivery_ref',
+                                'value': fields[ref_field]
+                            })
+        
         return json.dumps({
-            "matches": [
-                {
-                    "primary": "invoice",
-                    "related": ["po", "grn"],
-                    "key": "po_number"
-                }
-            ]
+            'matches': matches,
+            'document_types': list(documents.keys())
         })
 
 class EvaluateComplianceRulesTool(BaseTool):
@@ -74,28 +187,32 @@ def get_agents():
             goal="Extract structured data from business documents.",
             backstory="Expert in OCR and field extraction.",
             tools=[tools['extract']],
-            verbose=True
+            verbose=True,
+            max_iterations=3  # Limit parsing attempts
         ),
         'matcher': Agent(
             role="Document Matcher",
             goal="Match related documents based on key identifiers.",
             backstory="Expert in document relationship analysis.",
             tools=[tools['match']],
-            verbose=True
+            verbose=True,
+            max_iterations=3  # Limit matching attempts
         ),
         'checker': Agent(
             role="Compliance Rule Evaluator",
             goal="Validate parsed document fields using structured rules.",
             backstory="Compliance officer trained in document consistency checking.",
             tools=[tools['evaluate']],
-            verbose=True
+            verbose=True,
+            max_iterations=5  # Allow more iterations for complex rule evaluation
         ),
         'explainer': Agent(
             role="LLM Failure Explainer",
             goal="Explain why rules failed in simple, clear language.",
             backstory="Assistant who makes audit results understandable using LLM insights.",
             tools=[tools['explain']],
-            verbose=True
+            verbose=True,
+            max_iterations=2  # Limit explanation attempts
         )
     }
 
@@ -134,7 +251,8 @@ def get_crew():
     return Crew(
         agents=[agents['parser'], agents['matcher'], agents['checker']],
         tasks=[tasks['parse'], tasks['match'], tasks['evaluate']],
-        verbose=False
+        verbose=False,
+        max_iterations=10  # Overall limit for the main pipeline
     )
 
 def run_crew_pipeline(
@@ -155,6 +273,18 @@ def run_crew_pipeline(
     """
     if log_fn: log_fn("🚀 Starting compliance check pipeline...")
     
+    # Validate file paths
+    if not file_paths:
+        raise ValueError("No file paths provided")
+        
+    # Convert file paths to absolute paths
+    abs_file_paths = {
+        doc_type: str(Path(file_path).resolve())
+        for doc_type, file_path in file_paths.items()
+    }
+    
+    if log_fn: log_fn(f"📁 Processing files: {json.dumps(abs_file_paths, indent=2)}")
+    
     # Get the cached components
     agents = get_agents()
     tasks = get_tasks()
@@ -163,26 +293,47 @@ def run_crew_pipeline(
     main_crew = Crew(
         agents=[agents['parser'], agents['matcher']],
         tasks=[tasks['parse'], tasks['match']],
-        verbose=False
+        verbose=False,
+        max_iterations=6  # Limit for parsing and matching phase
     )
     
     # Run the main pipeline
     if log_fn: log_fn("✅ Processing documents...")
     main_result = main_crew.kickoff(inputs={
-        "file_paths": json.dumps(file_paths)
+        "file_paths": json.dumps(abs_file_paths)  # Use absolute paths
     })
     
     # Unpack TaskOutput objects
     parse_out, match_out = main_result.tasks_output
-    # Grab your JSON strings (or use .raw_output if that's what your version exposes)
     parsed_documents = parse_out.raw
-    matched_documents  = match_out.raw  # Second task: match
+    matched_documents = match_out.raw
+    
+    # Validate parsed documents
+    try:
+        parsed_docs = json.loads(parsed_documents)
+        if "error" in parsed_docs:
+            raise ValueError(f"Document processing error: {parsed_docs['error']}")
+        if not parsed_docs:
+            raise ValueError("No documents were parsed successfully")
+    except json.JSONDecodeError as e:
+        if log_fn: log_fn(f"❌ Error parsing documents: {str(e)}")
+        if log_fn: log_fn(f"Raw output: {parsed_documents}")
+        raise ValueError(f"Failed to parse documents: {str(e)}")
+    
+    # Log document matches
+    if log_fn:
+        matches = json.loads(matched_documents)
+        if matches.get('matches'):
+            log_fn("📎 Document matches found:")
+            for match in matches['matches']:
+                log_fn(f"- {match['primary']} ↔️ {match['related']} (via {match['key']})")
     
     # Create evaluation crew
     eval_crew = Crew(
         agents=[agents['checker']],
         tasks=[tasks['evaluate']],
-        verbose=False
+        verbose=False,
+        max_iterations=5  # Limit for evaluation phase
     )
     
     # Run evaluation
@@ -203,7 +354,8 @@ def run_crew_pipeline(
         explanation_crew = Crew(
             agents=[agents['explainer']],
             tasks=[tasks['explain']],
-            verbose=False
+            verbose=False,
+            max_iterations=2  # Limit for explanation phase
         )
         
         for r in failed_rules:
