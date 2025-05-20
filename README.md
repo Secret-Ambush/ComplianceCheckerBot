@@ -1,5 +1,3 @@
----
-
 # Crew AI Orchestrated Workflow
 
 The system leverages LangChain for LLM integration and task routing, while CrewAI orchestrates multi-agent workflows, enabling modular, explainable, and extensible compliance checks driven by structured tasks and collaborative reasoning.
@@ -81,33 +79,6 @@ The system leverages LangChain for LLM integration and task routing, while CrewA
 
 ---
 
-## 📝 Example Scenario
-
-### 📎 Input
-
-* Invoice: `INV1001.pdf`
-* Purchase Order: `PO505.pdf`
-* Goods Receipt Note: `GRN802.pdf`
-
-### 🔍 Sample Rules
-
-```
-- Match invoice to PO and GRN using PO number
-- Invoice quantities ≤ PO quantities
-- Unit price matches PO
-- Invoice total within 2% of PO total
-- Invoice date ≥ GRN date
-- Vendor exists in approved list
-```
-
-### 📤 Output
-
-* JSON compliance report
-* Failures with LLM-based explanations
-* Summary of pass/fail per rule and per document
-
----
-
 ## 🛠️ Tech Stack
 
 | Component       | Technology                   |
@@ -125,19 +96,3 @@ The system leverages LangChain for LLM integration and task routing, while CrewA
 * Local-first processing (no file storage)
 * No persistent database
 * Temporary file cleanup per session
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome. Please fork the repository and submit a pull request with improvements or bug fixes.
-
----
-
-## 📄 License
-
-Licensed under the MIT License. See the `LICENSE` file for details.
-
----
-
-Built for the **Al Shirawi Intelligent Compliance Agent Challenge**.
