@@ -1,13 +1,6 @@
 # Scalable Workflow
-
-An AI-driven system for validating document compliance against business rules using natural language processing and intelligent document parsing.
-
----
-
-## 🚀 Overview
-
-This project automates compliance validation by transforming human-readable rules into executable logic and evaluating them against extracted document data. It integrates NLP, OCR, and document linking to enable robust rule-based verification workflows.
-
+The system is designed with a **modular** architecture and **stateless API** endpoints, making it inherently scalable across distributed environments and cloud-native deployments.
+In this plan, FastAPI serves as the backend service layer, exposing REST endpoints for document processing and rule validation, enabling scalable, modular, and language-agnostic integration with frontends and external systems.
 ---
 
 ## ✨ Features
