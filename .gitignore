@@ -1,0 +1,72 @@
+# Virtual Environment
+venv/
+env/
+.env/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+logs/
+log/
+
+# Local development
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+
+__pycache__/agents.cpython-311.pyc
+__pycache__/compliance_agent.cpython-39.pyc
+__pycache__/compliance_agent.cpython-310.pyc
+__pycache__/compliance_agent.cpython-311.pyc
+__pycache__/compliance_report_generator.cpython-39.pyc
+__pycache__/compliance_report_generator.cpython-310.pyc
+__pycache__/compliance_report_generator.cpython-311.pyc
+__pycache__/crew_runner.cpython-39.pyc
+__pycache__/crew_runner.cpython-310.pyc
+__pycache__/crew_runner.cpython-311.pyc
+__pycache__/document_reader.cpython-39.pyc
+__pycache__/document_reader.cpython-310.pyc
+__pycache__/document_reader.cpython-311.pyc
+__pycache__/llm_agent.cpython-39.pyc
+__pycache__/llm_agent.cpython-310.pyc
+__pycache__/llm_agent.cpython-311.pyc
+__pycache__/nl_rule_parser.cpython-39.pyc
+__pycache__/nl_rule_parser.cpython-310.pyc
+__pycache__/nl_rule_parser.cpython-311.pyc
+__pycache__/tools.cpython-311.pyc
