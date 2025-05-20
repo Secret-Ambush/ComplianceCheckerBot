@@ -1,52 +1,118 @@
 # 📄 Intelligent Document Compliance Agent
 
-This project is an AI-powered agent that automates document compliance workflows. It acts like a human compliance officer by interpreting natural language rules, extracting structured data from business documents, and producing clear compliance reports with pass/fail logic, cross-document checks, and contextual reasoning.
+An AI-powered compliance automation system that transforms how organizations handle document validation and compliance checks. This system combines the power of Large Language Models (LLMs) with structured rule processing to create an intelligent, human-like compliance officer.
 
----
+## 🌟 Key Benefits
 
-## 🧠 Key Features
+### 1. Natural Language Rule Processing
+- Define compliance rules in plain English
+- No need for complex programming or rule engines
+- Rules are automatically converted into structured logic
+- Supports complex multi-document relationships
 
-- ✅ Upload and process scanned or native PDF, image, or text documents (e.g., invoices, POs, GRNs)
-- 🧾 Define rules in **natural language** — the agent converts these into structured logic
-- 🔎 Evaluate logical conditions, lookups, and cross-document dependencies
-- 📊 Generate a **structured compliance report** with pass/fail per rule
-- 🧠 Includes **LLM-generated explanations** for failed validations
-- 💬 Built with **LangChain**, **Streamlit**, **Tesseract OCR**, and **pdfplumber**
+### 2. Intelligent Document Processing
+- Handles multiple document types (PDF, images, text)
+- Extracts structured data using OCR and text analysis
+- Maintains document relationships (Invoice → PO → GRN)
+- Preserves original document context
 
----
+### 3. Advanced Compliance Checking
+- Cross-document validation
+- Complex logical conditions
+- Reference data lookups
+- Automated data consistency checks
 
-## 🧱 System Architecture
+### 4. Human-Friendly Reporting
+- Clear pass/fail indicators
+- LLM-generated explanations for failures
+- Contextual insights into rule violations
+- Downloadable compliance reports
 
-**Main Components:**
+## 🏗️ System Architecture
 
-- `document_reader.py` → Extracts text and fields from uploaded documents
-- `nl_rule_parser.py` → Converts natural language rule into structured JSON
-- `compliance_agent.py` → Evaluates rule logic across one or more documents
-- `llm_agent.py` → Generates LLM commentary for failed rules
-- `compliance_report_generator.py` → Creates a structured Markdown compliance report
-- `compliance_checker_app.py` → Streamlit UI for uploading documents and entering rules
+### Core Components
 
----
+1. **Document Processing Layer**
+   - `document_reader.py`: Handles OCR and field extraction
+   - Supports multiple document formats
+   - Extracts structured data and tables
 
-## 📝 Example Use
+2. **Rule Processing Layer**
+   - `nl_rule_parser.py`: Converts natural language to structured rules
+   - `compliance_agent.py`: Evaluates rules against documents
+   - Supports complex logical conditions
 
-### Upload:
-- `invoice_INV1001.pdf`
-- `PO505.pdf`
-- `GRN802.pdf`
+3. **Intelligence Layer**
+   - `llm_agent.py`: Provides human-like explanations
+   - `crew_runner.py`: Orchestrates AI agents
+   - Uses CrewAI for task coordination
 
-### Enter Rule:
-> "Ensure the invoice date is on or after the GRN date and vendor is approved."
+4. **User Interface**
+   - `compliance_checker_app.py`: Streamlit-based web interface
+   - Real-time processing feedback
+   - Interactive rule input
+   - Visual compliance reports
 
-### Output:
-- ✅ Invoice Date ≥ GRN Date
-- ❌ Vendor not in approved list  
-  💡 _LLM: The vendor ID `XYZ Ltd` was not found in the reference list._
+## 🚀 Getting Started
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Run the application:
+   ```bash
+   streamlit run compliance_checker_app.py
+   ```
+
+3. Upload documents and define rules through the web interface
+
+## 📝 Example Use Case
+
+### Input Documents
+- Invoice (INV1001.pdf)
+- Purchase Order (PO505.pdf)
+- Goods Receipt Note (GRN802.pdf)
+
+### Sample Rules
+```
+- Match Invoice to PO and GRN using PO number
+- Ensure invoice line items don't exceed PO quantities
+- Verify unit prices match PO values
+- Check total invoice amount is within 2% of PO total
+- Validate invoice date is on or after GRN date
+- Confirm vendor is in approved list
+```
+
+### Output
+- ✅ Structured compliance report
+- ❌ Clear failure explanations
+- 💡 LLM-generated insights
+- 📊 Summary statistics
+
+## 🛠️ Technical Stack
+
+- **Frontend**: Streamlit
+- **Document Processing**: Tesseract OCR, pdfplumber
+- **AI/ML**: LangChain, CrewAI
+- **Rule Engine**: Custom implementation
+- **LLM Integration**: GPT-4
+
+## 🔒 Security & Privacy
+
+- Local document processing
+- No data persistence
+- Secure file handling
+- Temporary file cleanup
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 
 Made with ❤️ for the Al Shirawi Intelligent Compliance Agent Challenge.
-
----
-
-![alt text](<Screenshot 2025-05-17 at 11.18.38 pm.png>)
