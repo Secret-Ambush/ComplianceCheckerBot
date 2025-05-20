@@ -1,165 +1,111 @@
-# Compliance Checker Bot
+# Rule Based Workflow
 
-A sophisticated document compliance checking system that combines rule-based validation with LLM-powered analysis to ensure document accuracy and compliance.
+An AI-augmented document compliance system that automates validation across business documents using structured rule logic, intelligent field extraction, and optional LLM assistance for rule interpretation and failure explanation.
+
+---
 
 ## 🌟 Key Features
 
-### 1. Intelligent Document Processing
-- **Multi-format Support**: Handles PDF, TXT, and image-based documents
-- **Smart Field Extraction**: Uses a combination of template matching, regex, and LLM-based extraction
-- **Vendor Detection**: Automatically identifies document sources
-- **Type Classification**: Intelligent document categorization based on content and filename
+### 📑 Document Processing
 
-### 2. Flexible Rule Engine
-- **Natural Language Rule Input**: Convert plain English rules into structured JSON format
-- **Nested Validation**: Support for complex hierarchical document structures
-- **Multiple Comparison Types**:
-  - Equality checks
-  - Numeric comparisons with tolerance
-  - Date validations
-  - Lookup operations
-  - Custom expressions
+* **Multi-format Input**: Supports PDF (native/scanned), text, and images
+* **Smart Field Extraction**: Uses Tesseract, `pdfplumber`, regex, and layout-based logic
+* **Document Classification**: Identifies and tags documents by type and source
+* **Vendor Detection**: Infers origin from filename patterns or metadata
 
-### 3. Advanced Analysis Capabilities
-- **LLM-Powered Explanations**: Get detailed explanations for failed compliance checks
-- **Aggregation Support**: Perform calculations across document sections
-- **Reference Data Integration**: Compare against external reference data
-- **Detailed Reporting**: Generate comprehensive compliance reports
+### 🧾 Rule Engine
 
-## 🛠 Technical Architecture
+* **Plain English → JSON Rule Conversion**: Uses an LLM to convert natural language into structured rule logic
+* **Validation Types Supported**:
 
-### Core Components
-- `document_reader.py`: Document ingestion and field extraction
-- `compliance_agent.py`: Rule evaluation engine
-- `llm_agent.py`: LLM-powered failure analysis
-- `nl_rule_parser.py`: Natural language to JSON rule conversion
-- `compliance_report_generator.py`: Report generation
+  * Equality and inequality checks
+  * Numeric comparisons with tolerances
+  * Date comparisons
+  * Reference lookups
+  * Expression-based conditions
+* **Nested Field Support**: Traverse deep or grouped document structures
+* **Cross-document Checks**: Match values across PO, Invoice, and GRN documents
 
-### Workflow
-1. Document ingestion and field extraction
-2. Rule parsing and validation
-3. Compliance checking
-4. LLM-powered analysis (optional)
-5. Report generation
+### 🧠 LLM Integration (Optional)
 
-## 💪 Strengths
+* **Rule Translation**: Converts plain language into rule JSON
+* **Failure Explanation**: Generates natural language reasoning for non-compliance cases
 
-1. **Flexibility**
-   - Supports multiple document formats
-   - Extensible rule system
-   - Customizable validation logic
+### 📊 Structured Reporting
 
-2. **Intelligence**
-   - LLM-powered explanations
-   - Smart field extraction
-   - Context-aware validation
+* Pass/fail summaries for each rule
+* LLM-backed explanations for failed checks
+* Markdown/JSON report generation
+* Streamlit frontend with real-time results
 
-3. **Robustness**
-   - Error handling
-   - Fallback mechanisms
-   - Detailed logging
+---
 
-4. **Scalability**
-   - Modular architecture
-   - Batch processing support
-   - Extensible design
+## 🧱 Architecture Overview
 
-## 🚀 Benefits
+```text
+Natural Language Rules
+        ↓ (Optional LLM)
+Structured JSON Rules
+        ↓
++-----------------------+
+|  DocumentProcessor    | ← OCR & parsing (Tesseract/pdfplumber)
++-----------------------+
+        ↓
++-----------------------+
+|   RuleEvaluator       | ← Applies rules to extracted fields
++-----------------------+
+        ↓
++-----------------------+
+|   ReportGenerator     | ← Summarises results, formats output
++-----------------------+
+```
 
-1. **Efficiency**
-   - Automated compliance checking
-   - Reduced manual review time
-   - Batch processing capabilities
+### 🧩 Core Files
 
-2. **Accuracy**
-   - Consistent rule application
-   - Multiple validation layers
-   - Detailed error reporting
+| File                             | Purpose                               |
+| -------------------------------- | ------------------------------------- |
+| `document_reader.py`             | Parses fields/tables from documents   |
+| `nl_rule_parser.py`              | Converts plain-language rules to JSON |
+| `compliance_agent.py`            | Evaluates rules on structured data    |
+| `llm_agent.py` (optional)        | Explains failed rules via GPT-4       |
+| `compliance_report_generator.py` | Creates structured reports            |
+| `compliance_checker_app.py`      | Streamlit-based frontend              |
 
-3. **Transparency**
-   - Clear compliance reports
-   - LLM-powered explanations
-   - Detailed audit trails
+---
 
-4. **Maintainability**
-   - Clear code structure
-   - Modular design
-   - Well-documented components
+## 🚀 Usage
 
-## 🔜 Future Enhancements
+### 🛠 Setup
 
-- Table parsing capabilities
-- Enhanced document classification
-- Cloud OCR integration
-- Line item comparison
-- Document grouping by PO number
-- Conversational interface
-
-## 🛠 Setup and Usage
-
-1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+Maintain a .env with an OpenAI key
 
-2. Configure your environment:
+### ▶️ Run the App
+
 ```bash
-cp .env.example .env
-# Edit .env with your configuration
+streamlit run compliance_checker_app.py
 ```
 
-3. Run the compliance checker:
-```bash
-python compliance_checker_app.py
-```
+---
 
-## 📝 License
+## 🧰 Tech Stack
 
-MIT License - See LICENSE file for details
+| Layer          | Tools                   |
+| -------------- | ----------------------- |
+| Frontend       | Streamlit               |
+| OCR            | Tesseract               |
+| PDF Parsing    | pdfplumber              |
+| Rule Engine    | Custom JSON-based logic |
+| LLM (Optional) | OpenAI GPT (via API)    |
 
 ---
 
-## 🧠 Key Features
+## 🔒 Security & Privacy
 
-- ✅ Upload and process scanned or native PDF, image, or text documents (e.g., invoices, POs, GRNs)
-- 🧾 Define rules in **natural language** — the agent converts these into structured logic
-- 🔎 Evaluate logical conditions, lookups, and cross-document dependencies
-- 📊 Generate a **structured compliance report** with pass/fail per rule
-- 🧠 Includes **LLM-generated explanations** for failed validations
-- 💬 Built with **LangChain**, **Streamlit**, **Tesseract OCR**, and **pdfplumber**
-
----
-
-## 🧱 System Architecture
-
-**Main Components:**
-
-- `document_reader.py` → Extracts text and fields from uploaded documents
-- `nl_rule_parser.py` → Converts natural language rule into structured JSON
-- `compliance_agent.py` → Evaluates rule logic across one or more documents
-- `llm_agent.py` → Generates LLM commentary for failed rules
-- `compliance_report_generator.py` → Creates a structured Markdown compliance report
-- `compliance_checker_app.py` → Streamlit UI for uploading documents and entering rules
-
----
-
-## 📝 Example Use
-
-### Upload:
-- `invoice_INV1001.pdf`
-- `PO505.pdf`
-- `GRN802.pdf`
-
-### Enter Rule:
-> "Ensure the invoice date is on or after the GRN date and vendor is approved."
-
-### Output:
-- ✅ Invoice Date ≥ GRN Date
-- ❌ Vendor not in approved list  
-  💡 _LLM: The vendor ID `XYZ Ltd` was not found in the reference list._
-
----
-
-Made with ❤️ for the Al Shirawi Intelligent Compliance Agent Challenge.
+* No persistent data storage
+* Temporary files are deleted post-processing
+* All document parsing happens locally by default
 
 ---
