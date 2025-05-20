@@ -1,6 +1,7 @@
 # Scalable Workflow
 The system is designed with a **modular** architecture and **stateless API** endpoints, making it inherently scalable across distributed environments and cloud-native deployments.
 In this plan, FastAPI serves as the backend service layer, exposing REST endpoints for document processing and rule validation, enabling scalable, modular, and language-agnostic integration with frontends and external systems.
+
 ---
 
 ## ✨ Features
