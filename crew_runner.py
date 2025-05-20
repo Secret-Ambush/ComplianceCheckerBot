@@ -34,18 +34,41 @@ class MatchDocumentsTool(BaseTool):
     description: str = "Matches related documents based on key identifiers and returns matched pairs."
 
     def _run(self, documents_json: str) -> str:
-        documents = json.loads(documents_json)
-        # Implement document matching logic here
-        # For now, return a simple structure
-        return json.dumps({
-            "matches": [
-                {
-                    "primary": "invoice",
-                    "related": ["po", "grn"],
-                    "key": "po_number"
+        try:
+            documents = json.loads(documents_json)
+            # Basic matching logic - can be enhanced based on specific requirements
+            matches = []
+            for doc_type, doc_data in documents.items():
+                if isinstance(doc_data, dict):
+                    # Look for common identifiers like PO numbers, invoice numbers, etc.
+                    identifiers = {
+                        'po_number': doc_data.get('po_number'),
+                        'invoice_number': doc_data.get('invoice_number'),
+                        'grn_number': doc_data.get('grn_number')
+                    }
+                    # Filter out None values
+                    identifiers = {k: v for k, v in identifiers.items() if v is not None}
+                    
+                    if identifiers:
+                        matches.append({
+                            "document_type": doc_type,
+                            "identifiers": identifiers,
+                            "related_documents": []
+                        })
+            
+            return json.dumps({
+                "matches": matches,
+                "status": "success"
+            })
+        except Exception as e:
+            return json.dumps({
+                "error": str(e),
+                "status": "error",
+                "details": {
+                    "message": "Failed to match documents",
+                    "exception": str(e)
                 }
-            ]
-        })
+            })
 
 class EvaluateComplianceRulesTool(BaseTool):
     name: str = "evaluate_compliance_rules"
@@ -181,6 +204,13 @@ def run_crew_pipeline(
     """
     if log_fn: log_fn("🚀 Starting compliance check pipeline...")
     
+    try:
+        # Validate input JSON
+        json.loads(rules_json)
+    except json.JSONDecodeError as e:
+        if log_fn: log_fn(f"Invalid rules JSON: {str(e)}")
+        return json.dumps([]), []
+    
     # Get the cached components
     agents = get_agents()
     tasks = get_tasks()
@@ -194,9 +224,13 @@ def run_crew_pipeline(
     
     # Run the main pipeline
     if log_fn: log_fn("✅ Processing documents...")
-    main_result = main_crew.kickoff(inputs={
-        "file_paths": json.dumps(file_paths)
-    })
+    try:
+        main_result = main_crew.kickoff(inputs={
+            "file_paths": json.dumps(file_paths)
+        })
+    except Exception as e:
+        if log_fn: log_fn(f"Error in main pipeline: {str(e)}")
+        return json.dumps([]), []
     
     # Unpack TaskOutput objects
     parse_out, match_out = main_result.tasks_output
@@ -210,9 +244,15 @@ def run_crew_pipeline(
         if log_fn: log_fn(f"Error parsing documents JSON: {str(e)}")
         if log_fn: log_fn(f"Invalid JSON content: {parse_out.raw}")
         # Return empty valid JSON instead of failing
-        parsed_documents = json.dumps([])
+        return json.dumps([]), []
     
-    matched_documents = match_out.raw  # Second task: match
+    # Process matched documents
+    try:
+        matched_documents = json.loads(match_out.raw)
+        if log_fn: log_fn(f"Matched documents: {json.dumps(matched_documents, indent=2)}")
+    except json.JSONDecodeError as e:
+        if log_fn: log_fn(f"Error parsing matched documents: {str(e)}")
+        matched_documents = {"matches": [], "status": "error"}
     
     # Create evaluation crew
     eval_crew = Crew(
@@ -223,10 +263,15 @@ def run_crew_pipeline(
     
     # Run evaluation
     if log_fn: log_fn("🔍 Evaluating rules...")
-    eval_result = eval_crew.kickoff(inputs={
-        "documents_json": parsed_documents,
-        "rules_json": rules_json
-    })
+    try:
+        eval_result = eval_crew.kickoff(inputs={
+            "documents_json": parsed_documents,
+            "rules_json": rules_json,
+            "matched_documents": json.dumps(matched_documents)
+        })
+    except Exception as e:
+        if log_fn: log_fn(f"Error in evaluation: {str(e)}")
+        return parsed_documents, []
     
     # Unpack the single TaskOutput from the evaluation crew
     eval_out = eval_result.tasks_output[0]
@@ -253,14 +298,18 @@ def run_crew_pipeline(
         
         for r in failed_rules:
             if log_fn: log_fn(f"💬 Generating explanation for rule `{r['rule_id']}`...")
-            explanation_result = explanation_crew.kickoff(inputs={
-                "failed_rule": json.dumps({"rule_id": r["rule_id"], "on_fail": r["reason"]}),
-                "rule_values": json.dumps(r["details"]),
-                "docs_json": parsed_documents
-            })
-            
-            # Correctly access the task output from the CrewOutput object
-            explain_out = explanation_result.tasks_output[0]
-            r["llm_commentary"] = explain_out.raw
+            try:
+                explanation_result = explanation_crew.kickoff(inputs={
+                    "failed_rule": json.dumps({"rule_id": r["rule_id"], "on_fail": r["reason"]}),
+                    "rule_values": json.dumps(r["details"]),
+                    "docs_json": parsed_documents
+                })
+                
+                # Correctly access the task output from the CrewOutput object
+                explain_out = explanation_result.tasks_output[0]
+                r["llm_commentary"] = explain_out.raw
+            except Exception as e:
+                if log_fn: log_fn(f"Error generating explanation for rule {r['rule_id']}: {str(e)}")
+                r["llm_commentary"] = "Failed to generate explanation"
     
     return parsed_documents, rule_outcomes
