@@ -1,6 +1,7 @@
-# Crew AI Orchestrated Workflow
+# Crew AI Orchestrated Workflow  
 
 The system leverages LangChain for LLM integration and task routing, while CrewAI orchestrates multi-agent workflows, enabling modular, explainable, and extensible compliance checks driven by structured tasks and collaborative reasoning.
+
 ---
 
 ## 🌟 Key Capabilities
