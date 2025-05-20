@@ -1,91 +1,91 @@
-# Document Compliance Checker
+# Scalable Workflow
 
-A sophisticated document compliance validation system that leverages AI and natural language processing to automate the verification of document compliance against business rules.
+An AI-driven system for validating document compliance against business rules using natural language processing and intelligent document parsing.
+
+---
 
 ## 🚀 Overview
 
-This project represents an innovative approach to document compliance checking, combining modern AI technologies with traditional document processing to create a flexible and intelligent validation system. While still in development, it demonstrates significant potential for revolutionizing how organizations handle document compliance.
+This project automates compliance validation by transforming human-readable rules into executable logic and evaluating them against extracted document data. It integrates NLP, OCR, and document linking to enable robust rule-based verification workflows.
 
-## ✨ Key Features
+---
 
-### 1. Natural Language Rule Processing
-- Convert human-readable compliance rules into machine-executable validation logic
-- Support for complex rule interpretation using advanced NLP
-- Flexible rule definition without requiring technical expertise
+## ✨ Features
 
-### 2. Intelligent Document Processing
-- Multi-format document support (PDF, images, text)
-- OCR capabilities with layout analysis
-- Document relationship detection and cross-referencing
+### 🧠 Natural Language Rule Parsing
 
-### 3. Advanced Validation Engine
-- Context-aware validation considering document relationships
-- Confidence scoring for validation results
-- Detailed compliance reporting in multiple formats
+* Parses and interprets human-written compliance rules
+* Supports logical expressions, tolerances, date checks, and lookups
+* No coding required to define rules
 
-### 4. Modern Tech Stack
-- FastAPI for high-performance API endpoints
-- LangChain for AI/ML pipeline integration
-- SQLAlchemy for robust data persistence
-- Comprehensive testing and development tools
+### 📄 Smart Document Processing
 
-## 🔮 Future Potential
+* Supports PDF, scanned images, and plain text
+* Uses OCR with layout awareness for scanned documents
+* Detects and links related documents (e.g., invoice ↔ PO ↔ GRN)
 
-While the current implementation is a work in progress, it demonstrates several promising directions for future development:
+### ✅ Validation Engine
 
-### 1. Enhanced AI Integration
-- Integration with more advanced language models
-- Improved document understanding and context analysis
-- Automated rule suggestion and optimization
+* Rule execution with context-aware logic
+* Generates structured results and explanations
+* Confidence scores for compliance decisions
 
-### 2. Scalability Improvements
-- Distributed processing for large document sets
-- Real-time validation capabilities
-- Cloud-native deployment options
+### ⚙️ Modern Tech Stack
 
-### 3. Extended Functionality
-- Custom rule templates and rule sets
-- Integration with existing compliance management systems
-- Advanced visualization of compliance relationships
+* **FastAPI**: RESTful service endpoints
+* **LangChain**: AI workflow orchestration
+* **SQLAlchemy**: Persistent data modelling
+* **Tesseract**: OCR for image-based PDFs
 
-### 4. Enterprise Features
-- Role-based access control
-- Audit logging and compliance tracking
-- Integration with enterprise document management systems
+---
 
-## 🛠️ Technical Architecture
+## 🛠 Architecture
 
-The system is built with a modular architecture that separates concerns and enables easy extension:
+```
+User Input → Document Processor → Rule Engine → Validation Engine → Report
+```
 
-- **Core Components**: Document processing, rule engine, validation engine
-- **API Layer**: RESTful endpoints for system interaction
-- **Data Layer**: Persistent storage with SQLAlchemy
-- **AI/ML Pipeline**: Integration with OpenAI and other AI services
+**Modules:**
 
-## 📋 Requirements
+* `DocumentProcessor`: Extracts fields and tables from documents
+* `RuleEngine`: Parses and executes compliance rules
+* `ValidationEngine`: Evaluates rule outcomes with optional LLM feedback
+* `ReportGenerator`: Summarises compliance outcomes
 
-See `requirements.txt` for detailed dependencies. Key requirements include:
-- Python 3.8+
-- OpenAI API key
-- Tesseract OCR (optional)
+---
 
-## 🚧 Current Status
+## 📦 Requirements
 
-This project is under active development. While the core architecture and basic functionality are in place, several features are still being refined and enhanced. The current implementation serves as a proof of concept and foundation for future development.
+* Python 3.8+
+* `requirements.txt` dependencies
+* OpenAI API Key (for LLM explanation module)
+* Tesseract OCR (for scanned PDFs)
 
-## 🔄 Development Roadmap
+---
 
-1. **Phase 1** (Current)
-   - Basic document processing
-   - Rule interpretation
-   - Simple validation logic
+## 🧭 Roadmap
 
-2. **Phase 2** (Planned)
-   - Enhanced AI integration
-   - Improved document relationship detection
-   - Advanced reporting capabilities
+**Phase 1** *(In Progress)*
 
-3. **Phase 3** (Future)
-   - Enterprise features
-   - Scalability improvements
-   - Integration capabilities
+* Core rule engine and document parser
+* Basic validation and reporting
+
+**Phase 2**
+
+* LLM-enhanced context interpretation
+* Inter-document validation (cross-checking GRN, PO, invoices)
+* Enhanced failure explanation via LLMs
+
+**Phase 3**
+
+* Role-based access and audit logging
+* Integration with DMS and ERP systems
+* Distributed processing for scale
+
+---
+
+## 📌 Status
+
+Core functionality is implemented and usable. Additional features (e.g., auto-rule suggestion, enterprise security, advanced reporting) are planned for future iterations.
+
+---
