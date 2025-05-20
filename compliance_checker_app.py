@@ -18,7 +18,6 @@ if "matched_documents" not in st.session_state:
     st.session_state.matched_documents = {}
 
 # Lazy load expensive imports
-@st.cache_resource
 def load_dependencies():
     from nl_rule_parser import parse_natural_rule
     from crew_runner import run_crew_pipeline
