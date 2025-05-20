@@ -14,7 +14,20 @@ class ExtractAndParseDocumentTool(BaseTool):
     description: str = "Extracts fields and tables from a business document and returns structured JSON."
 
     def _run(self, file_path: str) -> str:
-        return json.dumps(process_document(Path(file_path)))
+        try:
+            result = process_document(Path(file_path))
+            # Ensure the result is valid JSON by parsing and re-stringifying
+            return json.dumps(result)
+        except Exception as e:
+            # Return a valid JSON error response
+            return json.dumps({
+                "error": str(e),
+                "result": "error",
+                "details": {
+                    "message": "Failed to process document",
+                    "exception": str(e)
+                }
+            })
 
 class MatchDocumentsTool(BaseTool):
     name: str = "match_documents"
@@ -187,9 +200,19 @@ def run_crew_pipeline(
     
     # Unpack TaskOutput objects
     parse_out, match_out = main_result.tasks_output
-    # Grab your JSON strings (or use .raw_output if that's what your version exposes)
-    parsed_documents = parse_out.raw
-    matched_documents  = match_out.raw  # Second task: match
+    
+    # Ensure parsed_documents is valid JSON
+    try:
+        parsed_documents = parse_out.raw
+        # Validate that it's proper JSON by parsing and re-stringifying
+        parsed_documents = json.dumps(json.loads(parsed_documents))
+    except json.JSONDecodeError as e:
+        if log_fn: log_fn(f"Error parsing documents JSON: {str(e)}")
+        if log_fn: log_fn(f"Invalid JSON content: {parse_out.raw}")
+        # Return empty valid JSON instead of failing
+        parsed_documents = json.dumps([])
+    
+    matched_documents = match_out.raw  # Second task: match
     
     # Create evaluation crew
     eval_crew = Crew(
